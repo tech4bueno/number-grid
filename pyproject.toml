@@ -1,0 +1,30 @@
+[project]
+name = "number-grid"
+version = "0.1.0"
+authors = [
+    { name = "Tech4bueno", email = "164949278+tech4bueno@users.noreply.github.com" },
+]
+description = "An annotable 1-100 number grid for teaching place value"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "aiohttp>=3.8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+number-grid = "number_grid.server:main"
+
+[tool.hatch.build]
+include = [
+    "number_grid/**/*.py",
+    "number_grid/static/*.html",
+]

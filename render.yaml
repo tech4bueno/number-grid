@@ -1,0 +1,10 @@
+services:
+- type: web
+  name: number-grid
+  runtime: docker
+  repo: https://github.com/tech4bueno/number-grid
+  plan: free
+  region: frankfurt
+  dockerContext: .
+  dockerfilePath: ./Dockerfile
+version: "1"

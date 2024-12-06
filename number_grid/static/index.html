@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Number Grid (1-100)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+
+        .container {
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            max-width: 95vw;
+        }
+
+        .controls-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            padding: 8px 16px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .control-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #0056b3;
+        }
+
+        .clear-btn {
+            padding: 8px 16px;
+            border: 2px solid #dc3545;
+            border-radius: 5px;
+            background: white;
+            color: #dc3545;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .clear-btn:hover {
+            background: #dc3545;
+            color: white;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 5px;
+            max-width: 800px;
+        }
+
+        .cell {
+            aspect-ratio: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #fff;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
+            padding: 5px;
+        }
+
+        .cell:active {
+            transform: scale(0.95);
+        }
+
+        .cell.hidden {
+            color: transparent;
+        }
+
+        .cell.blue-circle {
+            border: 2px solid #007bff;
+            border-radius: 50%;
+            background-color: #e7f1ff;
+        }
+
+        .cell.yellow-highlight {
+            background-color: #fff3cd;
+            border-color: #ffeeba;
+        }
+
+        .status {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+        }
+
+        @media (max-width: 600px) {
+            .cell {
+                font-size: 12px;
+            }
+            .container {
+                padding: 10px;
+            }
+            .control-btn, .clear-btn {
+                padding: 6px 12px;
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .cell {
+                font-size: 10px;
+            }
+            .container {
+                padding: 5px;
+            }
+            .control-btn, .clear-btn {
+                padding: 4px 8px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="controls-container">
+            <div class="controls">
+                <button class="control-btn active" data-action="blue-circle">Blue Circle</button>
+                <button class="control-btn" data-action="yellow-highlight">Yellow Highlight</button>
+                <button class="control-btn" data-action="hide">Show/Hide</button>
+            </div>
+            <button class="clear-btn">🗑 Clear All</button>
+        </div>
+        <div class="grid" id="grid"></div>
+        <div class="status" id="status">Connecting...</div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const grid = document.getElementById('grid');
+            const status = document.getElementById('status');
+            const controls = document.querySelector('.controls');
+            const clearBtn = document.querySelector('.clear-btn');
+            const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`);
+            
+            let currentAction = 'blue-circle';
+            let isInitialStateReceived = false;
+
+            function updateCell(number, state) {
+                const cell = grid.children[number - 1];
+                if (cell) {
+                    cell.classList.toggle('hidden', state.hidden);
+                    cell.classList.toggle('blue-circle', state.blueCircle);
+                    cell.classList.toggle('yellow-highlight', state.yellowHighlight);
+                }
+            }
+
+            clearBtn.addEventListener('click', () => {
+                grid.querySelectorAll('.cell').forEach(cell => {
+                    cell.classList.remove('hidden', 'blue-circle', 'yellow-highlight');
+                });
+
+                ws.send(JSON.stringify({
+                    action: 'clear-all',
+                    state: {
+                        hidden: false,
+                        blueCircle: false,
+                        yellowHighlight: false
+                    }
+                }));
+            });
+
+            controls.addEventListener('click', (e) => {
+                if (e.target.classList.contains('control-btn')) {
+                    controls.querySelectorAll('.control-btn').forEach(btn => 
+                        btn.classList.remove('active'));
+                    e.target.classList.add('active');
+                    currentAction = e.target.dataset.action;
+                }
+            });
+
+            // Create grid cells
+            for (let i = 1; i <= 100; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.textContent = i;
+                cell.addEventListener('click', () => {
+                    if (!isInitialStateReceived) return; // Prevent clicks until initial state is received
+
+                    switch (currentAction) {
+                        case 'hide':
+                            cell.classList.toggle('hidden');
+                            break;
+                        case 'blue-circle':
+                            cell.classList.toggle('blue-circle');
+                            cell.classList.remove('yellow-highlight');
+                            break;
+                        case 'yellow-highlight':
+                            cell.classList.toggle('yellow-highlight');
+                            cell.classList.remove('blue-circle');
+                            break;
+                    }
+
+                    ws.send(JSON.stringify({
+                        number: i,
+                        action: currentAction,
+                        state: {
+                            hidden: cell.classList.contains('hidden'),
+                            blueCircle: cell.classList.contains('blue-circle'),
+                            yellowHighlight: cell.classList.contains('yellow-highlight')
+                        }
+                    }));
+                });
+                grid.appendChild(cell);
+            }
+
+            ws.onopen = () => {
+                status.textContent = 'Connected, loading state...';
+                status.style.color = '#ffa500'; // Orange color while loading initial state
+            };
+
+            ws.onclose = () => {
+                status.textContent = 'Disconnected';
+                status.style.color = '#dc3545';
+                isInitialStateReceived = false;
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.action === 'init-complete') {
+                    isInitialStateReceived = true;
+                    status.textContent = 'Connected';
+                    status.style.color = '#28a745';
+                    return;
+                }
+                
+                if (data.action === 'clear-all') {
+                    grid.querySelectorAll('.cell').forEach(cell => {
+                        cell.classList.remove('hidden', 'blue-circle', 'yellow-highlight');
+                    });
+                } else {
+                    updateCell(data.number, data.state);
+                }
+            };
+        });
+    </script>
+</body>
+</html>
