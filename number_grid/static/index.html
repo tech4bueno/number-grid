@@ -71,8 +71,11 @@
         .grid {
             display: grid;
             grid-template-columns: repeat(10, 1fr);
-            gap: 5px;
+            gap: 1px;
             max-width: 800px;
+            background-color: #ddd;
+            padding: 1px;
+            border-radius: 5px;
         }
 
         .cell {
@@ -81,8 +84,7 @@
             justify-content: center;
             align-items: center;
             background-color: #fff;
-            border: 2px solid #ddd;
-            border-radius: 5px;
+            border: none;
             font-size: 16px;
             cursor: pointer;
             user-select: none;
@@ -99,14 +101,23 @@
         }
 
         .cell.blue-circle {
+            background-color: #ffffff;
+            position: relative;
+        }
+
+        .cell.blue-circle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            right: 2px;
+            bottom: 2px;
             border: 2px solid #007bff;
             border-radius: 50%;
-            background-color: #e7f1ff;
         }
 
         .cell.yellow-highlight {
             background-color: #fff3cd;
-            border-color: #ffeeba;
         }
 
         .status {
@@ -206,7 +217,7 @@
                 cell.className = 'cell';
                 cell.textContent = i;
                 cell.addEventListener('click', () => {
-                    if (!isInitialStateReceived) return; // Prevent clicks until initial state is received
+                    if (!isInitialStateReceived) return;
 
                     switch (currentAction) {
                         case 'hide':
@@ -237,7 +248,7 @@
 
             ws.onopen = () => {
                 status.textContent = 'Connected, loading state...';
-                status.style.color = '#ffa500'; // Orange color while loading initial state
+                status.style.color = '#ffa500';
             };
 
             ws.onclose = () => {
