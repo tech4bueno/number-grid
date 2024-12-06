@@ -6,6 +6,10 @@ A number grid that can be easily annotated for teaching and learning place value
 
 Go to https://number-grid.onrender.com (be patient: first load takes 1min+ on Render's free plan)
 
+Open in another tab (or on a different device) to see how the annotations sync in realtime.
+
+This way a parent can observe or annotate from a different device and not need to peer over a child's shoulder.
+
 ## Run
 
 ### With [uv](https://docs.astral.sh/uv/)
