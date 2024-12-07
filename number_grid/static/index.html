@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Number Grid (1-100)</title>
     <style>
+        /* Previous styles remain unchanged */
         body {
             font-family: Arial, sans-serif;
             display: flex;
@@ -196,7 +197,7 @@
             const controls = document.querySelector('.controls');
             const clearBtn = document.querySelector('.clear-btn');
             const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`);
-            
+
             let currentAction = 'blue-circle';
             let isInitialStateReceived = false;
 
@@ -217,7 +218,40 @@
                 return adjacent;
             }
 
-            function createCurvedArrow(start, end) {
+            function findArrowSequences(cells) {
+                const sequences = [];
+                const visited = new Set();
+
+                function dfs(current, sequence) {
+                    visited.add(current);
+                    sequence.push(current);
+
+                    const adjacent = getAdjacentCells(current);
+                    let foundNext = false;
+
+                    for (const next of adjacent) {
+                        if (!visited.has(next) && cells[next - 1].classList.contains('blue-circle')) {
+                            foundNext = true;
+                            dfs(next, sequence);
+                            break; // Only follow one path
+                        }
+                    }
+
+                    if (!foundNext && sequence.length > 0) {
+                        sequences.push([...sequence]);
+                    }
+                }
+
+                cells.forEach((cell, index) => {
+                    if (cell.classList.contains('blue-circle') && !visited.has(index + 1)) {
+                        dfs(index + 1, []);
+                    }
+                });
+
+                return sequences;
+            }
+
+            function createCurvedArrow(start, end, isLastInSequence) {
                 const startCell = grid.children[start - 1].getBoundingClientRect();
                 const endCell = grid.children[end - 1].getBoundingClientRect();
                 const gridRect = grid.getBoundingClientRect();
@@ -231,9 +265,8 @@
                 const dx = endX - startX;
                 const dy = endY - startY;
 
-                // Increased offset values
-                const curveOffset = 20; // Increased from 15
-                const lineOffset = 12;  // New offset for shifting the entire line
+                const curveOffset = 20;
+                const lineOffset = 12;
 
                 let cx1, cy1, cx2, cy2;
                 let adjustedStartX = startX;
@@ -242,21 +275,17 @@
                 let adjustedEndY = endY;
 
                 if (Math.abs(dx) > Math.abs(dy)) {
-                    // Horizontal connection
-                    // Move the entire line up
                     adjustedStartY -= lineOffset;
                     adjustedEndY -= lineOffset;
-                    
+
                     cx1 = adjustedStartX + dx / 4;
                     cy1 = adjustedStartY - curveOffset;
                     cx2 = adjustedEndX - dx / 4;
                     cy2 = adjustedEndY - curveOffset;
                 } else {
-                    // Vertical connection
-                    // Move the entire line right
                     adjustedStartX += lineOffset;
                     adjustedEndX += lineOffset;
-                    
+
                     cx1 = adjustedStartX + curveOffset;
                     cy1 = adjustedStartY + dy / 4;
                     cx2 = adjustedEndX + curveOffset;
@@ -269,44 +298,31 @@
                 path.setAttribute("stroke", "#ff0000");
                 path.setAttribute("stroke-width", "2");
                 path.setAttribute("fill", "none");
-                path.setAttribute("marker-end", "url(#arrowhead)");
+                if (isLastInSequence) {
+                    path.setAttribute("marker-end", "url(#arrowhead)");
+                }
                 path.setAttribute("data-start", start);
                 path.setAttribute("data-end", end);
 
                 return path;
             }
 
-
             function updateArrows() {
-                // Clear existing arrows
                 clearArrows();
 
-                // Check each cell with a blue circle
                 const cells = Array.from(grid.children);
-                cells.forEach((cell, index) => {
-                    if (cell.classList.contains('blue-circle')) {
-                        const currentNumber = index + 1;
-                        const adjacentNumbers = getAdjacentCells(currentNumber);
+                const sequences = findArrowSequences(cells);
 
-                        adjacentNumbers.forEach(adjNumber => {
-                            const adjCell = grid.children[adjNumber - 1];
-                            if (adjCell.classList.contains('blue-circle')) {
-                                // Only create arrow if it doesn't exist in reverse direction
-                                const existingArrow = arrowsSvg.querySelector(
-                                    `path[data-start="${adjNumber}"][data-end="${currentNumber}"]`
-                                );
-                                if (!existingArrow) {
-                                    const arrow = createCurvedArrow(currentNumber, adjNumber);
-                                    arrowsSvg.appendChild(arrow);
-                                }
-                            }
-                        });
+                sequences.forEach(sequence => {
+                    for (let i = 0; i < sequence.length - 1; i++) {
+                        const isLast = i === sequence.length - 2;
+                        const arrow = createCurvedArrow(sequence[i], sequence[i + 1], isLast);
+                        arrowsSvg.appendChild(arrow);
                     }
                 });
             }
 
             function clearArrows() {
-                // Remove all paths while keeping the defs element
                 const paths = arrowsSvg.querySelectorAll('path');
                 paths.forEach(path => path.remove());
             }
@@ -369,7 +385,7 @@
 
             controls.addEventListener('click', (e) => {
                 if (e.target.classList.contains('control-btn')) {
-                    controls.querySelectorAll('.control-btn').forEach(btn => 
+                    controls.querySelectorAll('.control-btn').forEach(btn =>
                         btn.classList.remove('active'));
                     e.target.classList.add('active');
                     currentAction = e.target.dataset.action;
@@ -426,14 +442,14 @@
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                
+
                 if (data.action === 'init-complete') {
                     isInitialStateReceived = true;
                     status.textContent = 'Connected';
                     status.style.color = '#28a745';
                     return;
                 }
-                
+
                 if (data.action === 'clear-all') {
                     grid.querySelectorAll('.cell').forEach(cell => {
                         cell.classList.remove('hidden', 'blue-circle', 'yellow-highlight');
