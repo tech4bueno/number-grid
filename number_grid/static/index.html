@@ -21,6 +21,7 @@
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             max-width: 95vw;
+            position: relative;
         }
 
         .controls-container {
@@ -68,6 +69,10 @@
             color: white;
         }
 
+        .grid-container {
+            position: relative;
+        }
+
         .grid {
             display: grid;
             grid-template-columns: repeat(10, 1fr);
@@ -76,6 +81,18 @@
             background-color: #ddd;
             padding: 1px;
             border-radius: 5px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .arrows-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
         }
 
         .cell {
@@ -90,6 +107,7 @@
             user-select: none;
             transition: all 0.2s ease;
             padding: 5px;
+            position: relative;
         }
 
         .cell:active {
@@ -163,13 +181,17 @@
             </div>
             <button class="clear-btn">🗑 Clear All</button>
         </div>
-        <div class="grid" id="grid"></div>
+        <div class="grid-container">
+            <svg class="arrows-svg" id="arrows-svg"></svg>
+            <div class="grid" id="grid"></div>
+        </div>
         <div class="status" id="status">Connecting...</div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const grid = document.getElementById('grid');
+            const arrowsSvg = document.getElementById('arrows-svg');
             const status = document.getElementById('status');
             const controls = document.querySelector('.controls');
             const clearBtn = document.querySelector('.clear-btn');
@@ -178,19 +200,162 @@
             let currentAction = 'blue-circle';
             let isInitialStateReceived = false;
 
+            function getAdjacentCells(index) {
+                const row = Math.floor((index - 1) / 10);
+                const col = (index - 1) % 10;
+                const adjacent = [];
+
+                // Check right
+                if (col < 9) adjacent.push(index + 1);
+                // Check left
+                if (col > 0) adjacent.push(index - 1);
+                // Check down
+                if (row < 9) adjacent.push(index + 10);
+                // Check up
+                if (row > 0) adjacent.push(index - 10);
+
+                return adjacent;
+            }
+
+            function createCurvedArrow(start, end) {
+                const startCell = grid.children[start - 1].getBoundingClientRect();
+                const endCell = grid.children[end - 1].getBoundingClientRect();
+                const gridRect = grid.getBoundingClientRect();
+
+                const startX = startCell.left + startCell.width / 2 - gridRect.left;
+                const startY = startCell.top + startCell.height / 2 - gridRect.top;
+                const endX = endCell.left + endCell.width / 2 - gridRect.left;
+                const endY = endCell.top + endCell.height / 2 - gridRect.top;
+
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                const dx = endX - startX;
+                const dy = endY - startY;
+
+                // Increased offset values
+                const curveOffset = 20; // Increased from 15
+                const lineOffset = 12;  // New offset for shifting the entire line
+
+                let cx1, cy1, cx2, cy2;
+                let adjustedStartX = startX;
+                let adjustedStartY = startY;
+                let adjustedEndX = endX;
+                let adjustedEndY = endY;
+
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    // Horizontal connection
+                    // Move the entire line up
+                    adjustedStartY -= lineOffset;
+                    adjustedEndY -= lineOffset;
+                    
+                    cx1 = adjustedStartX + dx / 4;
+                    cy1 = adjustedStartY - curveOffset;
+                    cx2 = adjustedEndX - dx / 4;
+                    cy2 = adjustedEndY - curveOffset;
+                } else {
+                    // Vertical connection
+                    // Move the entire line right
+                    adjustedStartX += lineOffset;
+                    adjustedEndX += lineOffset;
+                    
+                    cx1 = adjustedStartX + curveOffset;
+                    cy1 = adjustedStartY + dy / 4;
+                    cx2 = adjustedEndX + curveOffset;
+                    cy2 = adjustedEndY - dy / 4;
+                }
+
+                const pathD = `M ${adjustedStartX} ${adjustedStartY} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${adjustedEndX} ${adjustedEndY}`;
+
+                path.setAttribute("d", pathD);
+                path.setAttribute("stroke", "#ff0000");
+                path.setAttribute("stroke-width", "2");
+                path.setAttribute("fill", "none");
+                path.setAttribute("marker-end", "url(#arrowhead)");
+                path.setAttribute("data-start", start);
+                path.setAttribute("data-end", end);
+
+                return path;
+            }
+
+
+            function updateArrows() {
+                // Clear existing arrows
+                clearArrows();
+
+                // Check each cell with a blue circle
+                const cells = Array.from(grid.children);
+                cells.forEach((cell, index) => {
+                    if (cell.classList.contains('blue-circle')) {
+                        const currentNumber = index + 1;
+                        const adjacentNumbers = getAdjacentCells(currentNumber);
+
+                        adjacentNumbers.forEach(adjNumber => {
+                            const adjCell = grid.children[adjNumber - 1];
+                            if (adjCell.classList.contains('blue-circle')) {
+                                // Only create arrow if it doesn't exist in reverse direction
+                                const existingArrow = arrowsSvg.querySelector(
+                                    `path[data-start="${adjNumber}"][data-end="${currentNumber}"]`
+                                );
+                                if (!existingArrow) {
+                                    const arrow = createCurvedArrow(currentNumber, adjNumber);
+                                    arrowsSvg.appendChild(arrow);
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+
+            function clearArrows() {
+                // Remove all paths while keeping the defs element
+                const paths = arrowsSvg.querySelectorAll('path');
+                paths.forEach(path => path.remove());
+            }
+
             function updateCell(number, state) {
                 const cell = grid.children[number - 1];
                 if (cell) {
                     cell.classList.toggle('hidden', state.hidden);
                     cell.classList.toggle('blue-circle', state.blueCircle);
                     cell.classList.toggle('yellow-highlight', state.yellowHighlight);
+                    updateArrows();
                 }
             }
+
+            // Initialize SVG defs for arrowhead
+            const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+            const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+            marker.setAttribute("id", "arrowhead");
+            marker.setAttribute("markerWidth", "10");
+            marker.setAttribute("markerHeight", "7");
+            marker.setAttribute("refX", "9");
+            marker.setAttribute("refY", "3.5");
+            marker.setAttribute("orient", "auto");
+
+            const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+            polygon.setAttribute("points", "0 0, 10 3.5, 0 7");
+            polygon.setAttribute("fill", "#ff0000");
+
+            marker.appendChild(polygon);
+            defs.appendChild(marker);
+            arrowsSvg.appendChild(defs);
+
+            // Update SVG size when grid size changes
+            const resizeObserver = new ResizeObserver(entries => {
+                for (const entry of entries) {
+                    const gridRect = entry.target.getBoundingClientRect();
+                    arrowsSvg.setAttribute("width", gridRect.width);
+                    arrowsSvg.setAttribute("height", gridRect.height);
+                    updateArrows();
+                }
+            });
+
+            resizeObserver.observe(grid);
 
             clearBtn.addEventListener('click', () => {
                 grid.querySelectorAll('.cell').forEach(cell => {
                     cell.classList.remove('hidden', 'blue-circle', 'yellow-highlight');
                 });
+                clearArrows();
 
                 ws.send(JSON.stringify({
                     action: 'clear-all',
@@ -233,6 +398,8 @@
                             break;
                     }
 
+                    updateArrows();
+
                     ws.send(JSON.stringify({
                         number: i,
                         action: currentAction,
@@ -271,6 +438,7 @@
                     grid.querySelectorAll('.cell').forEach(cell => {
                         cell.classList.remove('hidden', 'blue-circle', 'yellow-highlight');
                     });
+                    updateArrows();
                 } else {
                     updateCell(data.number, data.state);
                 }
